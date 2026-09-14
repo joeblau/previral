@@ -33,11 +33,7 @@ struct TimelineView: View {
                 VStack(alignment: .leading, spacing: 7) {
                     ForEach(tracks) { track in
                         HStack(spacing: 12) {
-                            Text(displayName(track.name))
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundStyle(.secondary)
-                                .frame(width: 112, alignment: .trailing)
-                                .lineLimit(1)
+                            TimelineTrackLabel(name: track.name)
                             TrackBand(track: track)
                                 .clipShape(RoundedRectangle(cornerRadius: 4))
                                 .overlay(alignment: .leading) {
@@ -68,13 +64,127 @@ struct TimelineView: View {
         .frame(height: min(max(CGFloat(tracks.count) * 27 + 53, 155), 285))
     }
 
-    private func displayName(_ name: String) -> String {
+}
+
+struct TimelineTrackInfo {
+    let name: String
+
+    var title: String {
         switch name {
         case "DorsalAttention": "Dorsal attention"
         case "VentralAttention": "Ventral attention"
         case "Default": "Default mode"
         default: name
         }
+    }
+
+    // Network labels follow the Yeo 2011 seven-network cortical atlas:
+    // https://surfer.nmr.mgh.harvard.edu/fswiki/CorticalParcellation_Yeo2011
+    var summary: String {
+        switch name {
+        case "Overall":
+            "A summary of predicted response strength across the entire cortical surface, combining all brain networks."
+        case "Visual":
+            "Processes visual information, including shapes, colors, and motion."
+        case "Somatomotor":
+            "Supports movement and body sensations, such as touch and awareness of body position."
+        case "DorsalAttention":
+            "Helps direct attention toward a chosen location or goal, such as following an object on screen."
+        case "VentralAttention":
+            "Helps shift attention toward unexpected or relevant events, such as a sudden sound or change in a scene."
+        case "Limbic":
+            "Includes cortical regions associated with emotion, motivation, and memory. This atlas label covers part of the broader limbic system."
+        case "Frontoparietal":
+            "Supports flexible control of thinking and behavior, including working memory, planning, and adjusting to a task."
+        case "Default":
+            "Often involved in internally directed thought, such as remembering, imagining, and thinking about yourself or other people."
+        case "Auditory":
+            "Processes sounds, including speech, music, and environmental sounds."
+        case "Language":
+            "Supports understanding words and combining them into meaningful language."
+        case "Audio":
+            "Predicted cortical responses when the model receives only the video's audio features."
+        case "Video":
+            "Predicted cortical responses when the model receives only visual features from the video frames."
+        case "Text":
+            "Predicted cortical responses when the model receives only text features from the video's speech transcript."
+        default:
+            "Predicted activity averaged across the cortical regions assigned to this network."
+        }
+    }
+
+    var isAtlasNetwork: Bool {
+        ["Visual", "Somatomotor", "DorsalAttention", "VentralAttention", "Limbic", "Frontoparietal", "Default"].contains(name)
+    }
+
+    var measurement: String {
+        switch name {
+        case "Overall":
+            "This row summarizes response magnitude across the cortex, including both positive and negative predictions."
+        case "Audio", "Video", "Text":
+            "This row summarizes positive responses above the zero-input baseline across the cortex. Unavailable inputs contribute no response."
+        default:
+            "This row shows the average predicted response within the network."
+        }
+    }
+}
+
+struct TimelineTrackLabel: View {
+    let name: String
+    @State private var isHovered = false
+    @State private var showsInfo = false
+    @FocusState private var infoIsFocused: Bool
+
+    private var info: TimelineTrackInfo { TimelineTrackInfo(name: name) }
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(info.title)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 112, alignment: .trailing)
+                .lineLimit(1)
+            Button { showsInfo.toggle() } label: {
+                Image(systemName: "info.circle")
+                    .font(.system(size: 12))
+                    .frame(width: 18, height: 20)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(isHovered || showsInfo || infoIsFocused ? Color.secondary : Color.clear)
+            .focused($infoIsFocused)
+            .accessibilityLabel("About \(info.title)")
+            .help("About \(info.title)")
+            .popover(isPresented: $showsInfo, arrowEdge: .trailing) {
+                TimelineTrackExplanation(info: info)
+            }
+        }
+        .contentShape(Rectangle())
+        .onHover { isHovered = $0 }
+    }
+}
+
+struct TimelineTrackExplanation: View {
+    let info: TimelineTrackInfo
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(info.title)
+                .font(.headline)
+            Text(info.summary)
+                .font(.callout)
+            Text(info.measurement)
+                .font(.caption).foregroundStyle(.secondary)
+            Text("Brighter colors indicate higher values within this row over the video. Colors are scaled separately for each row.")
+                .font(.caption).foregroundStyle(.secondary)
+            if info.isAtlasNetwork {
+                Link("About the Yeo 7-network atlas", destination: URL(string: "https://surfer.nmr.mgh.harvard.edu/fswiki/CorticalParcellation_Yeo2011")!)
+                    .font(.caption)
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(16)
+        .frame(width: 300, alignment: .leading)
     }
 }
 

@@ -6,6 +6,7 @@ struct ContentView: View {
     @State private var analysis = AnalysisViewModel()
     @State private var mesh: BrainMesh?
     @State private var inflatedBrain = false
+    @State private var multimodalMode = false
     @State private var brainResetVersion = 0
     @State private var meshError: String?
     @State private var currentColors: [SIMD4<Float>]?
@@ -37,32 +38,27 @@ struct ContentView: View {
                         BrainView(mesh: mesh, vertexColors: currentColors,
                                   inflated: inflatedBrain, resetVersion: brainResetVersion)
                             .overlay(alignment: .top) {
-                                HStack {
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        Text("Predicted brain activity")
-                                            .font(.subheadline.weight(.medium))
-                                        Text("Drag to rotate · Scroll to zoom")
-                                            .font(.caption2).foregroundStyle(.secondary)
-                                    }
-                                    Spacer()
-                                    Picker("Surface", selection: $inflatedBrain) {
-                                        Text("Folded").tag(false)
-                                        Text("Inflated").tag(true)
-                                    }
-                                    .pickerStyle(.segmented)
-                                    .frame(width: 140)
-                                    Button { brainResetVersion += 1 } label: {
-                                        Image(systemName: "arrow.counterclockwise")
-                                    }
-                                    .help("Reset brain view")
+                                BrainControls(multimodal: $multimodalMode, inflated: $inflatedBrain) {
+                                    brainResetVersion += 1
                                 }
-                                .padding(16)
                             }
                             .overlay(alignment: .bottomLeading) {
                                 VStack(alignment: .leading, spacing: 6) {
-                                    Text(currentColors == nil ? "Anatomy · Awaiting analysis" : "Positive response")
+                                    Text(brainLegendTitle)
                                         .font(.caption.weight(.medium))
-                                    if currentColors != nil {
+                                    if multimodalMode {
+                                        Text(analysis.multimodal == nil
+                                             ? (analysis.isRunning ? "Computing audio, video, and text responses…" : "Analyze the video to generate modality responses.")
+                                             : "Audio · Video · Text — blended where responses overlap")
+                                            .font(.caption2).foregroundStyle(.secondary)
+                                        if analysis.activity != nil && analysis.multimodal == nil && !analysis.isRunning {
+                                            Button("Analyze for Multimodality") {
+                                                if let url = viewModel.videoURL { analysis.analyze(videoURL: url) }
+                                            }
+                                            .controlSize(.small)
+                                            .disabled(viewModel.videoURL == nil || !missingModels.isEmpty)
+                                        }
+                                    } else if currentColors != nil {
                                         HStack(spacing: 7) {
                                             Text("Low")
                                             LinearGradient(colors: (0...24).map {
@@ -75,7 +71,9 @@ struct ContentView: View {
                                         .font(.system(size: 10)).foregroundStyle(.secondary)
                                     }
                                 }
-                                .help("Positive predictions use a fixed scale across this video. Weak and negative responses remain gray; the medial wall is masked.")
+                                .help(multimodalMode
+                                      ? "Single-input predictions above the zero-input baseline, with a shared scale across the video. Text is red, audio green, and video blue. These comparisons are not additive contributions to the combined prediction."
+                                      : "Positive predictions use a fixed scale across this video. Weak and negative responses remain gray; the medial wall is masked.")
                                 .padding(16)
                             }
                     } else {
@@ -86,14 +84,16 @@ struct ContentView: View {
                         )
                     }
                 }
-                .frame(minWidth: 320, maxWidth: .infinity, minHeight: 360, maxHeight: .infinity)
+                .frame(minWidth: 440, maxWidth: .infinity, minHeight: 360, maxHeight: .infinity)
             }
             .frame(minHeight: 400, maxHeight: .infinity)
 
             TimelineView(
                 progress: viewModel.progress,
                 onSeek: { viewModel.seek(toFraction: $0) },
-                tracks: analysis.tracks ?? TimelineView.defaultTracks
+                tracks: multimodalMode
+                    ? (analysis.modalityTracks ?? [HeatTrack(name: "Audio", values: nil), HeatTrack(name: "Video", values: nil), HeatTrack(name: "Text", values: nil)])
+                    : (analysis.tracks ?? TimelineView.defaultTracks)
             )
             .padding(.horizontal)
 
@@ -156,6 +156,14 @@ struct ContentView: View {
             if let url { analysis.videoOpened(url) }
         }
         .onChange(of: analysis.generation) { _, _ in updateBrainColors() }
+        .onChange(of: multimodalMode) { _, _ in updateBrainColors() }
+    }
+
+    private var brainLegendTitle: String {
+        if multimodalMode {
+            return analysis.multimodal == nil ? "Multimodality · Awaiting analysis" : "Single-input responses"
+        }
+        return currentColors == nil ? "Anatomy · Awaiting analysis" : "Positive response"
     }
 
     @ViewBuilder
@@ -190,6 +198,12 @@ struct ContentView: View {
     }
 
     private func updateBrainColors() {
+        if multimodalMode {
+            currentColors = mesh.flatMap { mesh in
+                analysis.multimodal?.colors(predictionTime: viewModel.currentTime + hemodynamicOffsetSeconds, mesh: mesh)
+            }
+            return
+        }
         guard let activity = analysis.activity, let mesh else {
             currentColors = nil
             return

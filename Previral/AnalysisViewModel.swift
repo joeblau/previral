@@ -21,6 +21,8 @@ final class AnalysisViewModel: @unchecked Sendable {
 
     private(set) var state: State = .idle
     private(set) var activity: BrainActivity?
+    private(set) var multimodal: MultimodalActivity?
+    private(set) var modalityTracks: [HeatTrack]?
     /// Soft-failure notes from the last analysis (e.g. transcription fallback).
     private(set) var notes: [String] = []
     /// Timeline tracks derived from `activity`, expressed in stimulus time.
@@ -55,6 +57,8 @@ final class AnalysisViewModel: @unchecked Sendable {
         let token = sessionToken
         videoURL = url
         activity = nil
+        multimodal = nil
+        modalityTracks = nil
         generation += 1
         tracks = nil
         notes = []
@@ -84,13 +88,13 @@ final class AnalysisViewModel: @unchecked Sendable {
             do {
                 let result = try await AnalysisPipeline.run(videoURL: url) { progress in
                     Task { @MainActor in
+                        guard self.sessionToken == token else { return }
                         self.progressUpdated(progress)
                     }
                 }
                 await MainActor.run {
                     guard self.sessionToken == token else { return }
-                    self.notes = result.notes
-                    self.adopt(result.activity)
+                    self.adopt(result)
                 }
             } catch {
                 await MainActor.run {
@@ -121,7 +125,7 @@ final class AnalysisViewModel: @unchecked Sendable {
         sessionToken += 1
         videoURL = nil
         notes = []
-        adopt(result)
+        adopt(AnalysisResult(activity: result, notes: []))
     }
 
     /// Maps playhead (stimulus) time to the prediction TR that describes it —
@@ -149,11 +153,18 @@ final class AnalysisViewModel: @unchecked Sendable {
         state = .running(stage: progress.stage, fraction: progress.fraction)
     }
 
-    private func adopt(_ result: BrainActivity) {
-        activity = result
+    private func adopt(_ result: AnalysisResult) {
+        activity = result.activity
+        multimodal = result.multimodal
+        notes = result.notes
+        modalityTracks = result.multimodal.map { channels in
+            [("Audio", channels.audio), ("Video", channels.video), ("Text", channels.text)].map { name, activity in
+                HeatTrack(name: name, values: Self.stimulusTimeTrack(activity.overallTrack()))
+            }
+        }
         rebuildTracks()
         generation += 1
-        state = .ready(trCount: result.trCount)
+        state = .ready(trCount: result.activity.trCount)
     }
 
     private func rebuildTracks() {

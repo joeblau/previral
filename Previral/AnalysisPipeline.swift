@@ -100,13 +100,6 @@ final class ProgressReporter {
     }
 }
 
-/// A finished analysis plus soft-failure notes worth surfacing in the UI
-/// (e.g. speech transcription unavailable → text features zeroed).
-struct AnalysisResult: Sendable {
-    var activity: BrainActivity
-    var notes: [String]
-}
-
 /// The in-app TRIBE v2 analysis pipeline. Runs on a background task; each
 /// CoreML model is loaded lazily for its stage and released before the next
 /// stage loads its model (the four packages total ~9.4 GB).
@@ -214,20 +207,46 @@ enum AnalysisPipeline {
         // Stage 4 — fMRI head over 100 s windows.
         try Task.checkCancellation()
         let activity: BrainActivity
+        let multimodal: MultimodalActivity
         do {
             let head = try FmriEncoderModel(contentsOfCompiledModel: models.fmri)
             activity = try runHead(
                 textGrid: textGrid, audioGrid: audioGrid, videoGrid: videoGrid,
-                timesteps: timesteps, duration: duration, head: head, reporter: reporter
+                timesteps: timesteps, duration: duration, head: head, reporter: reporter,
+                progressRange: 0.85...0.876
             )
+            // Empty grids explicitly zero-fill an input. Subtracting the same
+            // zero-input baseline removes the head's response to its biases.
+            let baseline = try runHead(
+                textGrid: [], audioGrid: [], videoGrid: [], timesteps: timesteps,
+                duration: duration, head: head, reporter: reporter,
+                stage: "Computing modality baseline", progressRange: 0.876...0.902)
+            let text = try runHead(
+                textGrid: textGrid, audioGrid: [], videoGrid: [], timesteps: timesteps,
+                duration: duration, head: head, reporter: reporter,
+                stage: "Predicting text response", progressRange: 0.902...0.928)
+            let audio = try runHead(
+                textGrid: [], audioGrid: audioGrid, videoGrid: [], timesteps: timesteps,
+                duration: duration, head: head, reporter: reporter,
+                stage: "Predicting audio response", progressRange: 0.928...0.954)
+            let video = try runHead(
+                textGrid: [], audioGrid: [], videoGrid: videoGrid, timesteps: timesteps,
+                duration: duration, head: head, reporter: reporter,
+                stage: "Predicting video response", progressRange: 0.954...0.98)
+            multimodal = MultimodalActivity(
+                text: MultimodalActivity.response(text, relativeTo: baseline),
+                audio: MultimodalActivity.response(audio, relativeTo: baseline),
+                video: MultimodalActivity.response(video, relativeTo: baseline))
         }
 
         // Stage 5 — cache next to the video. A cache failure must not sink a
         // finished analysis.
         reporter.report(stage: "Saving cache…", fraction: 0.99, force: true)
-        try? AnalysisCache.save(activity: activity, videoURL: videoURL, duration: duration)
+        try Task.checkCancellation()
+        let result = AnalysisResult(activity: activity, notes: notes, multimodal: multimodal)
+        try? AnalysisCache.save(result: result, videoURL: videoURL, duration: duration)
         reporter.report(stage: "Done", fraction: 1, force: true)
-        return AnalysisResult(activity: activity, notes: notes)
+        return result
     }
 
     // MARK: - Stage 1: audio
@@ -749,7 +768,8 @@ enum AnalysisPipeline {
     /// dataloader; TRs entirely past the video end are not emitted.
     static func runHead(
         textGrid: [Float], audioGrid: [Float], videoGrid: [Float], timesteps n: Int,
-        duration: Double, head: FmriEncoderModel, reporter: ProgressReporter
+        duration: Double, head: FmriEncoderModel, reporter: ProgressReporter,
+        stage: String = "Running brain model", progressRange: ClosedRange<Double> = headRange
     ) throws -> BrainActivity {
         let windowCount = Int(ceil(Double(n) / Double(headFeatureTimesteps)))
         let trTotal = min(windowCount * headOutputTRs, max(1, Int(ceil(duration))))
@@ -771,8 +791,8 @@ enum AnalysisPipeline {
             let keep = max(0, min(headOutputTRs, trTotal - window * headOutputTRs))
             copyPredictions(predictions, into: &values, trCount: trTotal, trOffset: window * headOutputTRs, keep: keep)
             reporter.report(
-                stage: "Running brain model",
-                fraction: headRange.mapped(Double(window + 1) / Double(windowCount))
+                stage: stage,
+                fraction: progressRange.mapped(Double(window + 1) / Double(windowCount))
             )
         }
         return BrainActivity(values: values, vertexCount: FmriEncoderModel.vertexCount, trCount: trTotal)
@@ -785,7 +805,7 @@ enum AnalysisPipeline {
     ) {
         let dst = window.dataPointer.assumingMemoryBound(to: Float.self)
         memset(dst, 0, rows * headFeatureTimesteps * MemoryLayout<Float>.size)
-        guard valid > 0 else { return }
+        guard valid > 0, !grid.isEmpty else { return }
         grid.withUnsafeBufferPointer { gridPtr in
             guard let src = gridPtr.baseAddress else { return }
             for row in 0..<rows {
