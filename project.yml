@@ -1,0 +1,38 @@
+name: previral
+options:
+  bundleIdPrefix: com.joeblau
+  deploymentTarget:
+    macOS: "26.0"
+  createIntermediateGroups: true
+packages:
+  Transformers:
+    url: https://github.com/huggingface/swift-transformers
+    from: "1.3.4"
+targets:
+  previral:
+    type: application
+    platform: macOS
+    dependencies:
+      - package: Transformers
+        product: Transformers
+    sources:
+      - path: Previral
+        excludes:
+          - "**/.DS_Store"
+      - path: Models
+        optional: true
+        excludes:
+          - "**/.DS_Store"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.joeblau.previral
+        PRODUCT_NAME: previral
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.video
+        INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: previral transcribes the audio track of your video on-device to locate words on the timeline.
+        INFOPLIST_KEY_NSMicrophoneUsageDescription: Not used; speech recognition runs on video files you open.
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY: "-"
+        ENABLE_HARDENED_RUNTIME: NO
+        SWIFT_VERSION: "6.0"
+        MACOSX_DEPLOYMENT_TARGET: "26.0"

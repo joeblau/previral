@@ -1,0 +1,19 @@
+[project]
+name = "previral-conversion"
+version = "0.1.0"
+description = "CoreML conversion + validation tooling for TRIBE v2 (previral)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "torch>=2.5.1,<2.7",
+    "coremltools>=8",
+    "transformers",
+    "huggingface_hub",
+    "pyyaml",
+    "pandas",
+    "einops",
+    "numpy==2.2.6",
+    "nilearn",
+]
+
+[tool.uv]
+package = false
