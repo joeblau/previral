@@ -74,9 +74,21 @@ struct BrainRenderingCheck {
 
         let output = URL(fileURLWithPath: "build/brain-review", isDirectory: true)
         try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+        func modalityField(_ center: SIMD3<Float>) -> BrainActivity {
+            let values: [Float] = (0..<mesh.vertexCount).map { v in
+                let p = SIMD3(mesh.pialPositions[v * 3], mesh.pialPositions[v * 3 + 1], mesh.pialPositions[v * 3 + 2])
+                return exp(-simd_length_squared(p - center) / (2 * 45 * 45))
+            }
+            return BrainActivity(values: values, vertexCount: mesh.vertexCount, trCount: 1)
+        }
+        let modalities = MultimodalActivity(text: modalityField(SIMD3(-45, 30, 10)),
+                                           audio: modalityField(SIMD3(-55, -15, 0)),
+                                           video: modalityField(SIMD3(-30, -85, 15)))
+        let multimodalColors = modalities.colors(predictionTime: 0, mesh: mesh)
         guard let device = MTLCreateSystemDefaultDevice() else { fatalError("Metal unavailable for visual QA") }
         for (name, inflated, field) in [("folded", false, colors), ("neutral", false, mesh.anatomyColors),
-                                        ("inflated", true, colors)] {
+                                        ("inflated", true, colors), ("multimodal-folded", false, multimodalColors),
+                                        ("multimodal-inflated", true, multimodalColors)] {
             let setup = BrainView.makeScene(mesh: mesh, colors: field, inflated: inflated)
             let renderer = SCNRenderer(device: device, options: nil)
             renderer.scene = setup.scene
@@ -87,6 +99,13 @@ struct BrainRenderingCheck {
                 fatalError("Snapshot failed")
             }
             try png.write(to: output.appendingPathComponent("\(name).png"))
+        }
+        let legend = ImageRenderer(content: MultimodalLegend().padding(20)
+            .background(Color(white: 0.035)).environment(\.colorScheme, .dark))
+        legend.scale = 3
+        if let image = legend.nsImage, let tiff = image.tiffRepresentation,
+           let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
+            try png.write(to: output.appendingPathComponent("multimodal-legend.png"))
         }
         let track = HeatTrack(name: "Gradient", values: [0, 0.15, 0.45, 0.95, 0.6, 0.3, 0.4, 0.75, 1])
         let timeline = VStack(alignment: .leading, spacing: 16) {
@@ -108,6 +127,6 @@ struct BrainRenderingCheck {
             try png.write(to: output.appendingPathComponent("timeline.png"))
         }
         print("PASS: mesh compatibility, normals, color continuity, monotonic luminance, masking, interpolation, stable scaling")
-        print("Rendered folded, neutral, inflated, and timeline previews to build/brain-review/")
+        print("Rendered activity, multimodal, legend, and timeline previews to build/brain-review/")
     }
 }

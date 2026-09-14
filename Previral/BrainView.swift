@@ -1,6 +1,72 @@
 import SceneKit
 import SwiftUI
 
+struct BrainControls: View {
+    @Binding var multimodal: Bool
+    @Binding var inflated: Bool
+    var onReset: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 16) {
+            VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Predicted brain activity")
+                        .font(.subheadline.weight(.medium))
+                    Text("Drag to rotate · Scroll to zoom")
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 12) {
+                        modePicker
+                        surfaceControls
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        modePicker
+                        surfaceControls
+                    }
+                }
+                .controlSize(.small)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if multimodal {
+                MultimodalLegend()
+                    .fixedSize()
+            }
+        }
+        .padding(16)
+    }
+
+    private var modePicker: some View {
+        Picker("Visualization", selection: $multimodal) {
+            Text("Activity").tag(false)
+            Text("Multimodality").tag(true)
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .fixedSize()
+        .help("Choose activity intensity or audio, video, and text responses")
+    }
+
+    private var surfaceControls: some View {
+        HStack(spacing: 8) {
+            Picker("Surface", selection: $inflated) {
+                Text("Folded").tag(false)
+                Text("Inflated").tag(true)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .fixedSize()
+            Button(action: onReset) {
+                Image(systemName: "arrow.counterclockwise")
+            }
+            .accessibilityLabel("Reset brain view")
+            .help("Reset brain view")
+        }
+        .fixedSize()
+    }
+}
+
 /// Interactive cortical anatomy with a persistent scene and camera. Only the
 /// color source changes during playback; mesh topology and lighting are reused.
 struct BrainView: NSViewRepresentable {

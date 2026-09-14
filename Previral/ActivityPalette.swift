@@ -32,6 +32,17 @@ enum ActivityPalette {
         Color(.sRGB, red: Double(rgba.x), green: Double(rgba.y), blue: Double(rgba.z), opacity: Double(rgba.w))
     }
 
+    /// Additive RGB: text = red, audio = green, video = blue. Shared responses
+    /// become yellow, cyan, magenta, or white; weak responses retain anatomy.
+    static func multimodal(text: Float, audio: Float, video: Float, anatomy: SIMD4<Float>) -> SIMD4<Float> {
+        let rgb = SIMD3(clamp(text), clamp(audio), clamp(video))
+        let peak = max(rgb.x, rgb.y, rgb.z)
+        let blend = clamp(peak / 0.35)
+        let opacity = blend * blend * (3 - 2 * blend)
+        let color = SIMD4(rgb.x, rgb.y, rgb.z, Float(1))
+        return anatomy * (1 - opacity) + color * opacity
+    }
+
     static func sample(_ value: Float, stops: [SIMD3<Float>]) -> SIMD4<Float> {
         let position = clamp(value) * Float(stops.count - 1)
         let index = min(Int(position), stops.count - 2)
@@ -62,6 +73,56 @@ enum ActivityPalette {
         return SIMD3(gamma(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s),
                      gamma(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s),
                      gamma(-0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s))
+    }
+}
+
+/// Three faces of an additive RGB cube, matching the surface color channels.
+struct MultimodalLegend: View {
+    var body: some View {
+        VStack(spacing: 0) {
+            Text("Video").foregroundStyle(Color(red: 0.48, green: 0.56, blue: 1))
+            HStack(alignment: .bottom, spacing: 4) {
+                Text("Audio").foregroundStyle(Color(red: 0.4, green: 0.88, blue: 0.46))
+                Canvas { context, size in
+                    let top = CGPoint(x: size.width / 2, y: 0)
+                    let left = CGPoint(x: 0, y: size.height * 0.75)
+                    let right = CGPoint(x: size.width, y: size.height * 0.75)
+                    let center = CGPoint(x: size.width / 2, y: size.height / 2)
+                    let axes = [CGPoint(x: left.x - center.x, y: left.y - center.y),
+                                CGPoint(x: right.x - center.x, y: right.y - center.y),
+                                CGPoint(x: top.x - center.x, y: top.y - center.y)]
+                    let channels: [SIMD3<Float>] = [SIMD3(0, 1, 0), SIMD3(1, 0, 0), SIMD3(0, 0, 1)]
+                    for face in 0..<3 {
+                        let a = (face + 1) % 3, b = (face + 2) % 3
+                        for i in 0..<24 {
+                            for j in 0..<24 {
+                                func point(_ u: CGFloat, _ v: CGFloat) -> CGPoint {
+                                    CGPoint(x: center.x + axes[a].x * u + axes[b].x * v,
+                                            y: center.y + axes[a].y * u + axes[b].y * v)
+                                }
+                                let u = CGFloat(i) / 24, v = CGFloat(j) / 24
+                                let x = Float(u), y = Float(v)
+                                let rgb = SIMD3<Float>(repeating: (1 - x) * (1 - y))
+                                    + channels[a] * x + channels[b] * y
+                                var path = Path()
+                                path.move(to: point(u, v))
+                                path.addLine(to: point(u + 1 / 24, v))
+                                path.addLine(to: point(u + 1 / 24, v + 1 / 24))
+                                path.addLine(to: point(u, v + 1 / 24))
+                                path.closeSubpath()
+                                context.fill(path, with: .color(ActivityPalette.color(SIMD4(rgb, 1))),
+                                             style: FillStyle(antialiased: false))
+                            }
+                        }
+                    }
+                }
+                .frame(width: 64, height: 64)
+                Text("Text").foregroundStyle(Color(red: 1, green: 0.48, blue: 0.46))
+            }
+        }
+        .font(.system(size: 10, weight: .medium))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Multimodality: video blue, audio green, text red. Blended colors indicate shared responses.")
     }
 }
 

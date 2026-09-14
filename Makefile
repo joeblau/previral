@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := run
 
-.PHONY: xcodegen stop build run verify-brain
+.PHONY: xcodegen stop build run verify-brain verify-multimodal
 
 xcodegen:
 	xcodegen generate
@@ -20,5 +20,10 @@ run: build
 
 verify-brain:
 	mkdir -p build
-	xcrun swiftc -swift-version 6 -O -o build/verify-brain Previral/ActivityPalette.swift Previral/BrainMesh.swift Previral/BrainActivity.swift Previral/BrainView.swift Previral/TimelineView.swift Verification/BrainRenderingCheck.swift
+	xcrun swiftc -swift-version 6 -O -o build/verify-brain Previral/ActivityPalette.swift Previral/BrainMesh.swift Previral/BrainActivity.swift Previral/MultimodalActivity.swift Previral/BrainView.swift Previral/TimelineView.swift Verification/BrainRenderingCheck.swift
 	./build/verify-brain
+
+verify-multimodal:
+	mkdir -p build
+	xcrun swiftc -swift-version 6 -O -o build/verify-multimodal Previral/ActivityPalette.swift Previral/BrainMesh.swift Previral/BrainActivity.swift Previral/MultimodalActivity.swift Previral/AnalysisCache.swift Previral/TimelineView.swift Previral/FmriEncoderModel.swift Verification/MultimodalCheck.swift
+	./build/verify-multimodal
