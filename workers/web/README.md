@@ -1,5 +1,7 @@
 # Previral landing page
 
+[Live site](https://blau-previral.joeblau.workers.dev)
+
 Next.js App Router site deployed with `@opennextjs/cloudflare` (OpenNext) as the
 Cloudflare Worker **`blau-previral`**. Run these commands from `workers/web/`.
 

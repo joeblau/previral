@@ -1,5 +1,7 @@
 # Previral
 
+[Live site](https://blau-previral.joeblau.workers.dev)
+
 Explore how video, sound, and language relate to predicted brain activity.
 Previral is a native macOS app built with SwiftUI, Apple Core ML, and Meta's
 TRIBE v2, with a Next.js landing page hosted on Cloudflare Workers.
