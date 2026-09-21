@@ -24,7 +24,7 @@ struct BrainMesh {
         case notFound, badMagic, truncated
         var errorDescription: String? {
             switch self {
-            case .notFound: "BrainMesh.bin not found in the app bundle. Run Conversion/export_brain_mesh.py and rebuild."
+            case .notFound: "BrainMesh.bin not found in the app bundle. Run apple/Conversion/export_brain_mesh.py and rebuild."
             case .badMagic: "BrainMesh.bin has an invalid header."
             case .truncated: "BrainMesh.bin is truncated or corrupt."
             }

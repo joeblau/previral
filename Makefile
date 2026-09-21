@@ -1,29 +1,18 @@
 .DEFAULT_GOAL := run
 
-.PHONY: xcodegen stop build run verify-brain verify-multimodal
+.PHONY: xcodegen stop build run verify-brain verify-multimodal web-dev web-build web-preview web-deploy
 
-xcodegen:
-	xcodegen generate
+xcodegen stop build run verify-brain verify-multimodal:
+	$(MAKE) -C apple $@
 
-stop:
-	xcrun swift Scripts/StopPreviral.swift
+web-dev:
+	npm --prefix workers/web run dev
 
-# Both prerequisites must finish before Xcode can replace the app's resources,
-# including when make is invoked with -j.
-build: stop xcodegen
-	xcodebuild -scheme previral -destination 'platform=macOS' build
+web-build:
+	npm --prefix workers/web run build:worker
 
-run: build
-	@app_path="$$(xcodebuild -scheme previral -destination 'platform=macOS' -showBuildSettings -json | python3 -c 'import json, os, sys; settings = next(item["buildSettings"] for item in json.load(sys.stdin) if item["target"] == "previral"); print(os.path.join(settings["BUILT_PRODUCTS_DIR"], settings["FULL_PRODUCT_NAME"]))')" && \
-		test -d "$$app_path" && \
-		open "$$app_path"
+web-preview:
+	npm --prefix workers/web run preview
 
-verify-brain:
-	mkdir -p build
-	xcrun swiftc -swift-version 6 -O -o build/verify-brain Previral/ActivityPalette.swift Previral/BrainMesh.swift Previral/BrainActivity.swift Previral/MultimodalActivity.swift Previral/BrainView.swift Previral/TimelineView.swift Verification/BrainRenderingCheck.swift
-	./build/verify-brain
-
-verify-multimodal:
-	mkdir -p build
-	xcrun swiftc -swift-version 6 -O -o build/verify-multimodal Previral/ActivityPalette.swift Previral/BrainMesh.swift Previral/BrainActivity.swift Previral/MultimodalActivity.swift Previral/AnalysisCache.swift Previral/TimelineView.swift Previral/FmriEncoderModel.swift Verification/MultimodalCheck.swift
-	./build/verify-multimodal
+web-deploy:
+	npm --prefix workers/web run deploy

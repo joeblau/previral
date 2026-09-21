@@ -101,7 +101,7 @@ struct ContentView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(.yellow)
-                    Text("Missing CoreML models: \(missingModels.joined(separator: ", ")). Run the conversion scripts in Conversion/ (see Conversion/NOTES_audio.md / NOTES_video.md), then rebuild with `make build`.")
+                    Text("Missing CoreML models: \(missingModels.joined(separator: ", ")). Run the conversion scripts in apple/Conversion/ (see apple/Conversion/NOTES_audio.md / NOTES_video.md), then rebuild with `make build`.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

@@ -6,11 +6,11 @@ build/
 
 # Converted models and weights (never committed)
 Models/
-Conversion/cache/
+apple/Conversion/cache/
 *.mlpackage
 
 # Python
-Conversion/.venv/
+apple/Conversion/.venv/
 __pycache__/
 *.pyc
 
@@ -19,3 +19,13 @@ __pycache__/
 *.previral.bin
 
 .DS_Store
+
+# Next.js / OpenNext / Cloudflare
+node_modules/
+.next/
+.open-next/
+.wrangler/
+.dev.vars*
+.env*
+!.env.example
+*.tsbuildinfo

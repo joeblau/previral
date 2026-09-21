@@ -1,43 +1,44 @@
-# previral
+# Previral
 
-Native macOS video analysis using Meta's TRIBE v2 model, with synchronized
-predicted cortical activity and network timelines. Requires macOS 26+, Xcode,
-and XcodeGen.
+Explore how video, sound, and language relate to predicted brain activity.
+Previral is a native macOS app built with SwiftUI, Apple Core ML, and Meta's
+TRIBE v2, with a Next.js landing page hosted on Cloudflare Workers.
 
-Clone with `git clone --recurse-submodules`, or run
-`git submodule update --init --recursive` in an existing checkout to retrieve
-the pinned TRIBE v2 source. Converted Core ML models and tokenizer files are
-generated locally under `Models/` and are not included in the repository. See
-the conversion scripts and `Conversion/NOTES_{audio,video,text}.md` for setup
-and validation details.
+## Repository layout
 
-Run `make` (or `make run`) to stop all running previral instances, build the
-current source, and launch the newly built app. Old instances are stopped before
-Xcode updates the app bundle, preventing old code from reading new resources.
+| Directory | Purpose |
+| --- | --- |
+| [`apple/`](apple/) | macOS app, XcodeGen project, model conversion tools, local models, and verification scripts |
+| [`workers/web/`](workers/web/) | Next.js landing page using OpenNext; Cloudflare Worker `blau-previral` |
 
-`make build` stops old instances and builds without launching. `make stop` only
-stops the app. All copies with bundle ID `com.joeblau.previral` are covered;
-unresponsive instances are force-stopped after a five-second grace period.
+Clone with `git clone --recurse-submodules https://github.com/joeblau/previral.git`,
+or run `git submodule update --init --recursive` in an existing checkout.
 
-`make verify-brain` checks the brain rendering and writes previews to
-`build/brain-review/`. See `Conversion/NOTES_brain.md` for the mesh export workflow.
+## macOS app
 
-Choose **Multimodality** above the brain to view synchronized audio (green),
-video (blue), and text (red) responses. Mixed colors show overlapping responses.
-Analysis runs the existing head with each input alone and subtracts its
-all-zero feature baseline, displaying positive differences on one shared scale.
-These input-isolation comparisons are not additive attributions of the combined
-prediction.
-Text comes from the video's speech transcript; unavailable inputs contribute no
-color. The timeline switches to three corresponding response tracks.
+Requires macOS 26+, Xcode, and XcodeGen. Converted Core ML models and tokenizer
+files are generated locally in `apple/Models/` and are not committed.
+See [`apple/README.md`](apple/README.md) for model setup and app details.
 
-Hover over a timeline label and click its info button for a description of the
-network or input, what the row measures, and how to read its colors. The button
-is also available through keyboard focus and VoiceOver.
+```sh
+make                 # stop old instances, build, and launch
+make build           # build without launching
+make verify-brain    # render checks and previews in apple/build/brain-review/
+make verify-multimodal
+```
 
-New analyses cache all three channels and transcription notes. Existing caches
-still open in Activity mode; choose **Analyze for Multimodality** to regenerate
-them. This adds four head passes while reusing the encoded features.
-`make verify-multimodal` checks colors, interpolation, missing inputs, and cache
-compatibility. Pass a compiled `FmriEncoder.mlmodelc` path to
-`build/verify-multimodal` for an additional real Core ML inference check.
+App targets forward to `apple/Makefile`; `make -C apple` works too.
+
+## Landing page
+
+Requires Node.js 22+ and npm.
+
+```sh
+npm --prefix workers/web ci
+make web-dev         # Next.js development server
+make web-build       # production OpenNext Worker build
+make web-preview     # build and run locally in the Workers runtime
+make web-deploy      # build and deploy blau-previral (Cloudflare login required)
+```
+
+See [`workers/web/README.md`](workers/web/README.md) for deployment and validation.

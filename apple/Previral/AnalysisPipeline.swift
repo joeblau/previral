@@ -22,7 +22,7 @@ enum AnalysisError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .modelNotFoundInBundle(let name):
-            "\(name).mlmodelc not found in the app bundle. Run the conversion scripts in Conversion/ and rebuild so Models/\(name).mlpackage is included."
+            "\(name).mlmodelc not found in the app bundle. Run the conversion scripts in apple/Conversion/ and rebuild so apple/Models/\(name).mlpackage is included."
         case .invalidDuration:
             "The video's duration is not finite or is zero."
         case .noVideoTrack:

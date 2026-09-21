@@ -9,7 +9,7 @@ enum FmriEncoderError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .modelNotFoundInBundle:
-            "FmriEncoder.mlmodelc not found in the app bundle. Run the conversion scripts in Conversion/ and rebuild so Models/FmriEncoder.mlpackage is included."
+            "FmriEncoder.mlmodelc not found in the app bundle. Run the conversion scripts in apple/Conversion/ and rebuild so apple/Models/FmriEncoder.mlpackage is included."
         case .missingOutput:
             "The CoreML prediction did not contain the expected 'predictions' output."
         }
